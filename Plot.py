@@ -3,6 +3,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib
 import pickle
+from scipy import stats
+
 
 
 #################################################
@@ -68,7 +70,7 @@ def heatmap(data, row_labels, col_labels, ax=None,
                    labeltop=True, labelbottom=False)
 
     # Rotate the tick labels and set their alignment.
-    plt.setp(ax.get_xticklabels(), rotation=-30, ha="right",rotation_mode="anchor")
+    plt.setp(ax.get_xticklabels(), rotation=-50, ha="right",rotation_mode="anchor")
 
     # Turn spines off and create white grid.
     for edge, spine in ax.spines.items():
@@ -141,6 +143,81 @@ def annotate_heatmap(im, data=None, valfmt="{x:.2f}",
             texts.append(text)
 
     return texts
+
+
+# LINEAR REGRESSION (LR)
+# Plotting function for linear regression
+
+def lr(a, b, y, sample, label_lr = "Normalized Linear regression ", label_sample = "Zipf random sample "):
+    # a = starting point, b = end point, y = data,
+    # if sample == 1 sampled data will be plotted with same slope as the one found in LR.
+    # x values fo LR are defined in [a+1,b]
+
+    x_LR = np.arange(1+a , b+1)
+    # Why 1+a : y[0] is defined in x = 1, so if we choose a = 0 then x = 1.
+    # Why b+1: np.arange exclude b, so if I need b included, it's necessary ro put b+1 inside np.arange
+    y_LR = y[a:b]
+
+    #scipy LR
+    slope, intercept, r_value, p_value, std_err = stats.linregress(np.log10(x_LR), np.log10(y_LR))
+
+    print('LR m for real data =', slope)
+    print('LR q for real data =', intercept)
+
+    # LR values, eq.3 report
+    c = 10 ** intercept
+    y_LR = (np.arange(1, len(y_LR)+1) ** round(slope, 3)) * c
+
+    #plotting linear regression
+    ax1.plot(np.arange(1, len(y_LR)+1), y_LR/np.sum(y_LR), label= label_lr , linewidth=1.3, zorder=100, color ='orange')
+
+    #plotting x_min Big Red Dot
+    ax1.scatter(a, y[a], s=30, color='red', label = '$x_{min}=$'+str(a)+ ", $\\alpha$ = " + str(round(slope, 3)) )
+
+    if sample == 1:
+        # Sampled data
+        random_zipf1 = stats.zipf.pmf(np.arange(1,b+1), a= -slope)
+        # Sample sorted
+        random_zipf1 =  - np.sort(-random_zipf1)
+        random_zipf2 = random_zipf1[a:b+1]/np.sum(random_zipf1[a:b+1])
+        print(np.sum(random_zipf1), len(random_zipf1), len(random_zipf2))
+        # Plotting
+        ax1.scatter(np.arange(1,len(random_zipf2)+1), random_zipf2, s=0.4, label=label_sample, color='green' )
+
+    return y_LR[1:a+1]
+
+#HEATMAPS plotting function.
+def distance_heatmap(js_D, counties, title):
+    itmap4 = plt.figure()
+    ax4 = itmap4.add_subplot(1, 1, 1)
+    im4, cbar4 = heatmap(js_D, counties, counties, ax=ax4, cmap='YlGn', cbarlabel=str(title))
+
+    # Annotation of values on the squares, it is not good if the matrix is huge
+    #texts = annotate_heatmap(im, valfmt="{x:.2f} ")
+
+    fig.tight_layout()
+
+#JS-KS RATIO plotting function
+def ratio(ks,js):
+    fig = plt.figure()
+    ax = fig.add_subplot(1, 1, 1)
+    ax.scatter(ks,js, s = 0.1)
+    # Axis settings
+    ax.set_xlabel('KS distance')
+    ax.set_ylabel('JS distance')
+    ax.grid(color='xkcd:light blue', linestyle='--', which='major', zorder=1, alpha=0.85)
+    ax.grid(color='xkcd:light blue', linestyle='--', which='minor', zorder=1, alpha=0.35)
+    ax.set_xticks(np.arange(0, 0.7, 0.05), minor=True)
+    ax.set_yticks(np.arange(0, 0.4, 0.05), minor=True)
+    #line
+    x = np.arange(1,len(ks))
+    #ax.plot(x,x, color = 'red')
+
+#Which counties you want to be plotted? Also numpy array are ok.
+#Chose a number between 1 and 3075
+which_county = [1819] #[1, 12, 75, 1356, 3000]
+xmin = 22
+
 #One of the row files to extract some usefull informations
 Adata = pd.read_csv(r'C:\Users\Salvo\Desktop\IFISC\data\INDEXES_PBW\INDEX_A_PBW.txt', sep=",", header=None,
                     low_memory=False)
@@ -151,33 +228,11 @@ TOT_counties = len(Adata[1][:]) - 1
 # List of total number of words per county, the order is the same as row data files
 tot_word = pd.read_csv('C:\\Users\Salvo\Desktop\IFISC\data\\no_words_per_county.csv', sep=",", low_memory=False,
                        index_col=[0])
-print(tot_word)
-
-#Which counties you want to be plotted? Also numpy array are ok.
-#Chose a number between 1 and 3075
-which_county = [1, 141, 12, 200, 134, 103, 34, 84, 100, 180]
-
 
 # Empty array to be filled with Total number of words of the i-th county
 word = np.zeros(3074)
 
-#c is the index to identify the i-th county
-c = which_county
-
-#I used this part when I needed to produce every time the list for y and cdf_y.
-# Now I have a file for y and better code for cdf_y
-"""
-# Initializing variables
-x = np.arange(1, 70000)
-for i in  range (len(which_county)) :
-    word[i] = int(tot_word.iloc[c[i], 1])
-    b = int(word[i])
-
-    y = [[0 for indiceacaso in range(1)] for indiceacaso2 in which_county]
-    cdf_y = [[0 for indiceacaso in range(70000)] for indiceacaso2 in which_county]
-"""
-
-# GRAPHIC
+# CALLING FIGURE
 fig = plt.figure()
 ax1 = fig.add_subplot(1, 1, 1)
 
@@ -185,40 +240,59 @@ ax1 = fig.add_subplot(1, 1, 1)
 with open(r'C:\Users\Salvo\Desktop\y.pkl', 'rb') as f:
     y = pickle.load(f)
 
+
+#CALCULATIONG CDF
 cdf_y = [[]]
-#CDF
-for i in which_county:
-    word[i] = int(tot_word.iloc[c[i], 1])
-    b = int(word[i])
+for i in range (3076):
     cdf_y.append([])
+for i in which_county:
+    word[i] = int(tot_word.iloc[i, 1])
+    #b is the total number of word for that county
+    b = int(word[i])
     partial_sum = 0
-    # print(b, len(y[i]))
 
     for j in range(b):
         partial_sum = partial_sum + y[i - 1][j]
         cdf_y[i].append(partial_sum)
 
-
     partial_sum = 0
-    print(cdf_y[i])
 
+    #PLOTTING
+    print(str(i) + Adata[1][i]) # Plotting this county
 
-    #GRAPHIC y and cdf
+    #PDF
+    ax1.plot(np.arange(1,len(y[i-1][:b])+1),y[i-1][:b],
+             linewidth = 1.3, label=str(i) + Adata[1][i] + str(b)+' words.', color='xkcd:navy blue')
+    #CDF
+    #ax1.plot(np.arange(1, len(y[i-1][:b]) + 1), cdf_y[i][:b],
+    #         linewidth=0.5 ,label='CDF_'+str(i) + ' ' + Adata[1][i] + ', ' + str(b) + ' words.')
 
-    ax1.plot(np.arange(1,len(y[i][:b])+1),y[i][:b],
-             linewidth = 0.5, label='PMF_'+str(c[i])+' '+ Adata[1][c[i]] +', '+str(b)+' words.')
+    #LINEAR REGRESSION plot
+    y_LR = np.zeros(b+xmin)
+    y_LR[1:xmin+1] = lr(xmin,b,y[i-1][:],1)
+    y_LR[xmin:] = y[i - 1][:b]
+    y_LR = y_LR/np.sum(y_LR)
 
-    ax1.plot(np.arange(1, len(y[i][:b]) + 1), cdf_y[i][:b],
-             linewidth=0.5 ,label='CDF_'+str(c[i]) + ' ' + Adata[1][c[i]] + ', ' + str(b) + ' words.')
+    ax1.plot(np.arange(1, len(y_LR[1:]) + 1), y_LR[1:],
+             linewidth=1.3, label='Modified PDF', color='brown')
+    xxx = np.arange(1, 10000, 0.5)
+    yyy = 1 / (5 + xxx) ** 1.5
+    ax1.plot(xxx, yyy,
+             linewidth=1.3, label='Modified Zipf', color='green')
+
+# Figure settings
+
+#x and y limits
+ax1.set_xlim([0.1, 3*b ])
+ax1.set_ylim([0.000000000001, 1])
 
 
 #Axis grid
-ax1.grid(color='xkcd:cherry', linestyle='--', which='major', zorder=1, alpha=0.75)
-ax1.set_xticks(np.arange(1,10000, 100), minor=False)
+ax1.grid(color='xkcd:light blue', linestyle='--', which='major', zorder=1, alpha=0.85)
+ax1.grid(color='xkcd:light blue', linestyle='--', which='minor', zorder=1, alpha=0.35)
+ax1.set_xticks(np.arange(1,70000, 100), minor=True)
+ax1.set_yticks(np.arange(1,70000, 100), minor=True)
 
-
-
-# Figure settings
 
 # Setting log-log scale
 ax1.set_yscale('log')
@@ -230,97 +304,52 @@ ax1.set_ylabel('Normalized frequency')
 
 ax1.legend(loc='best')
 
+########################################################################################################à
+# IMPORTING DISTANCE MATRICES
 
-
-############
-"""
-HEATMAP
-"""
-##########
-
-
-
-#######  KS Heatmaps
-
-#calling fig object
-itmap = plt.figure()
-ax = itmap.add_subplot(1, 1, 1)
-
+#KS
 #loading distance matrix
-combinations = 19900
-npzfile = np.load(r'C:\Users\Salvo\Desktop\IFISC\data\all_counties\ks\run\myD_value_'+str(int(combinations))+'_combinations.npz')
-print(npzfile.files)
-
-#assigning arrays in the file to new arrays
-D = npzfile['D']
-#p = npzfile['p']
-
-#grid is the list of the counties in the order they appear in the ditsance matrix
-grid = npzfile['counties']
-print(grid)
-
-#the same as before
-combinations = 4723201
-npzfile2 = np.load(r'C:\Users\Salvo\Desktop\IFISC\data\all_counties\ks\run\myD_value_'+str(int(combinations))+'_combinations.npz')
+npzfile2 = np.load(r'C:\Users\Salvo\Desktop\Project\ks_distanceMatrix.npz')
 print(npzfile2.files)
-myD = npzfile2['D']
-grid2 = npzfile2['counties']
+#assigning arrays in the file to new arrays
+myD = npzfile2['ks_D']
+#grid is the list of the counties in the order they appear in the ditsance matrix
+counties1 = npzfile2['counties']
 
-
-
-#calling plot functions
-im, cbar = heatmap(D, grid, grid, ax=ax, cmap="YlGn", cbarlabel="KS distance "+str(grid[0])+'-'+str(grid[len(grid)-1]))
-itmap3 = plt.figure()
-
-ax3 = itmap3.add_subplot(1, 1, 1)
-im3, cbar3 = heatmap(myD, grid, grid, ax=ax3, cmap="YlGn", cbarlabel="myKS distance "+str(grid[0])+'-'+str(grid[len(grid)-1]))
-
-
-#Annotation of values on the squares, it is not good if the matrix is huge
-#texts = annotate_heatmap(im, valfmt="{x:.2f} ")
-#fig.tight_layout()
-
+#JS
+js_distance = np.load(r'C:\Users\Salvo\Desktop\Project\js_distanceMatrix.npz')
+print(js_distance.files)
+js_D = js_distance['js_D']
+counties = js_distance['counties']
 
 """
-#G Heatmap
-itmap2 = plt.figure()
-ax2 = itmap2.add_subplot(1, 1, 1)
-
+#GEOGRAPHIC
 combinations = 4723201
 g_distance = np.load(r'C:\\Users\Salvo\Desktop\IFISC\data\\all_counties\g_distances\\run\g_D_'+str(int(combinations))+'_combinations.npz')
 print(g_distance.files)
 g_D = g_distance['D']
 g_grid = npzfile['counties']
 print(g_grid)
-im, cbar = heatmap(g_D, grid, grid, ax=ax2, cmap="YlGn", cbarlabel="Geographic distance"+str(grid[0])+'-'+str(grid[len(grid)-1]))
-#texts = annotate_heatmap(im, valfmt="{x:.2f} ")
-fig.tight_layout()
 """
 
+############
+"""
+PLOTTING HEATMAPS
+"""
+############
+
+#KS Heatmap
+#distance_heatmap(myD, counties1, 'KS heatmap')
 
 #JS heatmap
-itmap4 = plt.figure()
-ax4 = itmap4.add_subplot(1, 1, 1)
+#distance_heatmap(js_D, counties, 'JS heatmap')
 
-combinations = 4723201
-js_distance = np.load(r'C:\Users\Salvo\Desktop\IFISC\data\all_counties\js\run\jsD_value_'+str(int(combinations))+'_combinations.npz')
-print(js_distance.files)
-js_D = js_distance['jd_D']
-js_grid = npzfile['counties']
-#print(js_grid)
+#Geo heatmap
+#distance_heatmap(g_D, g_grid, 'Geo heatmap')
 
-im4, cbar4 = heatmap(js_D, grid, grid, ax=ax4, cmap="YlGn", cbarlabel="JS distance"+str(grid[0])+'-'+str(grid[len(grid)-1]))
-#texts = annotate_heatmap(im, valfmt="{x:.2f} ")
-fig.tight_layout()
+#COMPARING DISTANCES, RATIO JS/KS PLOT
+ratio(myD, js_D*(np.log2(10))**0.5)
 
-
-#COMPARING DISTANCES
-figDD = plt.figure()
-axD = figDD.add_subplot(1, 1, 1)
-axD.scatter(myD, js_D, s = 0.1)
-# Axis titles
-axD.set_xlabel('myKS distance')
-axD.set_ylabel('js distance')
 
 plt.show()
 
